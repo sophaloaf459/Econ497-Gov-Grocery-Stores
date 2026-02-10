@@ -31,11 +31,14 @@ KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |> select(-IBRS)
 
 
 # Unemployment Cleaning ---------------------------------------------------
+KC_unemp_data_monthly <- KC_unemp_data_monthly |> 
+  select(-AreaCode,-AreaName,-PeriodType,-SeasonalAdjustment,-RowType) 
+  
+KC_unemp_data_monthly <- KC_unemp_data_monthly |> 
+  select(-Period)
 
-
-
-
-
-
-
-
+KC_unemp_data_monthly <- KC_unemp_data_monthly %>%
+  mutate(Month = match(as.character(Month), month.name))
+# as.character() converts the month column to plain text first
+# This ensures match() can work with it properly
+# Then match() finds the position in month.name (1-12)
