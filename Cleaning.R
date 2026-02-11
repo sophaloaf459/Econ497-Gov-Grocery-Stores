@@ -3,6 +3,14 @@ library(tidyr)
 library(readr) 
 
 
+
+# Store Info -------------------------------------------------------------
+#Latitude: 39.0601° N
+#Longitude: 94.5450° W
+#Address: 3110 Prospect Ave, Kansas City, Missouri ----> OR 31st and Prospect
+#Hours: 07:00 – 21:00
+#Zip 64128 0r 64127
+
 # Crime Cleaning ----------------------------------------------------------
 #formatting date and time
 KCPD_Reported_Crime_Data <- read_csv("KCPD_Reported_Crime_Data.csv", 
@@ -19,7 +27,7 @@ KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |>
   mutate(across(c(year, month, day), as.numeric))
 
 
-#removing columns not needed
+#removing columns not needed & rename
 KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |> 
   filter(year>2014,Reported_Date>2014) |> 
   select(-Suspect_Count,-Victim_Count,-Arrestee_Count,-Deceased_Count)
@@ -27,8 +35,13 @@ KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |>
 KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |>
   select(-Location,-City,-Area)
 
-KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |> select(-IBRS)
+KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |> select(-IBRS)  
 
+KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |>
+  rename(zip= Zip_Code)
+
+KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |>
+ rename(date = Reported_Date, time = Reported_Time)
 
 
 # Unemployment Cleaning ---------------------------------------------------
@@ -51,7 +64,6 @@ KC_unemp_data_monthly <- KC_unemp_data_monthly |>
 
 # Population Cleaning -----------------------------------------------------
 
-
 #get correct range of zips
 MS_population_by_zip_and_year <- MS_population_by_zip_and_year |>
   filter(zip %in% 64101:64192) 
@@ -67,8 +79,6 @@ intersect(bad_zips, MS_population_by_zip_and_year$zip)
 #remove zips that are bad
 cleaned_pop_by_zip_and_year <- MS_population_by_zip_and_year |>
   filter(!zip %in% c(64118,64138,64150,64152,64161,64163,64164,64166,64167))
-
-
 
 
 
