@@ -52,15 +52,24 @@ KC_unemp_data_monthly <- KC_unemp_data_monthly |>
 # Population Cleaning -----------------------------------------------------
 
 
-# -------------------------------------------------------------------------
-#cleaning zips
+#get correct range of zips
+MS_population_by_zip_and_year <- MS_population_by_zip_and_year |>
+  filter(zip %in% 64101:64192) 
+
+
+#identify zips we dont want
 bad_zips <- c(64103,64104,64107,64115,64118,64121,64122,64135,64138,64140:64144,64148,
               64150,64150,64152,64159:64164,64166:64191)
 
-MS_population_by_zip_and_year <- MS_population_by_zip_and_year |>
-  filter(zip %in% 64101:64192) 
-  
+#see what bad zips are in data set
 intersect(bad_zips, MS_population_by_zip_and_year$zip)
+
+#remove zips that are bad
+cleaned_pop_by_zip_and_year <- MS_population_by_zip_and_year |>
+  filter(!zip %in% c(64118,64138,64150,64152,64161,64163,64164,64166,64167))
+
+
+
 
 
 
