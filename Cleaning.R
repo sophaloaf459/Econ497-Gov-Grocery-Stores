@@ -30,6 +30,7 @@ KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |>
 KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |> select(-IBRS)
 
 
+
 # Unemployment Cleaning ---------------------------------------------------
 KC_unemp_data_monthly <- KC_unemp_data_monthly |> 
   select(-AreaCode,-AreaName,-PeriodType,-SeasonalAdjustment,-RowType) 
@@ -42,3 +43,26 @@ KC_unemp_data_monthly <- KC_unemp_data_monthly %>%
 # as.character() converts the month column to plain text first
 # This ensures match() can work with it properly
 # Then match() finds the position in month.name (1-12)
+
+#renaming
+KC_unemp_data_monthly <- KC_unemp_data_monthly |> 
+  rename(month = Month, year = Year)
+
+
+# Population Cleaning -----------------------------------------------------
+
+
+# -------------------------------------------------------------------------
+#cleaning zips
+bad_zips <- c(64103,64104,64107,64115,64118,64121,64122,64135,64138,64140:64144,64148,
+              64150,64150,64152,64159:64164,64166:64191)
+
+MS_population_by_zip_and_year <- MS_population_by_zip_and_year |>
+  filter(zip %in% 64101:64192) 
+  
+intersect(bad_zips, MS_population_by_zip_and_year$zip)
+
+
+
+
+
