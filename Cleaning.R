@@ -1,8 +1,7 @@
 library(tidyverse)
 library(tidyr)
 library(readr) 
-
-
+library(readxl)
 
 # Store Info -------------------------------------------------------------
 #Latitude: 39.0601° N Or 39.06903775959004, -94.55448775544315
@@ -45,6 +44,7 @@ KCPD_Reported_Crime_Data <- KCPD_Reported_Crime_Data |>
 
 
 # Unemployment Cleaning ---------------------------------------------------
+KC_unemp_data_monthly <- read_excel("KC_unemp_data monthly.xlsx")
 KC_unemp_data_monthly <- KC_unemp_data_monthly |> 
   select(-AreaCode,-AreaName,-PeriodType,-SeasonalAdjustment,-RowType) 
   
@@ -63,6 +63,8 @@ KC_unemp_data_monthly <- KC_unemp_data_monthly |>
 
 
 # Population Cleaning -----------------------------------------------------
+
+MS_population_by_zip_and_year <- read_excel("MS population by zip and year.xlsx")
 
 #get correct range of zips
 MS_population_by_zip_and_year <- MS_population_by_zip_and_year |>
@@ -227,7 +229,40 @@ daily_data <- merged_data |>
   arrange(date)
 
 
-#remove na columns ensure there is 8 rows per day
+# Remove NAs and ensure 8 rows per day ----------------------------------
+all_combos <- expand.grid(
+  close = c(0, 1),
+  theft = c(0, 1),
+  violent = c(0, 1)
+)
+
+all_dates <- data.frame(date = unique(merged_data$date))
+
+full_grid <- merge(all_dates, all_combos)
+
+daily_counts <- merged_data |>
+  filter(!is.na(close), !is.na(theft), !is.na(violent)) |>
+  group_by(date, close, theft, violent) |>
+  summarise(TotalCrimes = n(), after_open = max(after_open), .groups = "drop")
+
+daily_dataset_no_na <- full_grid |>
+  left_join(daily_counts, by = c("date", "close", "theft", "violent")) |>
+  mutate(
+    TotalCrimes = ifelse(is.na(TotalCrimes), 0, TotalCrimes),
+    after_open = ifelse(is.na(after_open), as.numeric(date >= as.Date("2018-06-16")), after_open)
+  ) |>
+  arrange(date, close, theft, violent)
+
+
+# fun ---------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -273,6 +308,12 @@ map <- leaflet() |>
     popup = "Reference Point (Store)"
   )
 
+
+
+
+
+
+
 # Add a layer for each year
 for(y in sort(unique(merged_data_filtered$year))) {
   year_data <- merged_data_filtered |> filter(year == y)
@@ -314,6 +355,16 @@ map |> addLayersControl(
 )
 
 
+library(htmlwidgets)
+saveWidget(map, "crime_map.html")
+
+
+
+
+
+
+
+
 
 
 # ggplot fun --------------------------------------------------------------
@@ -342,3 +393,8 @@ merged_data |>
   ) +
   theme_minimal() +
   theme(legend.position = "bottom")
+
+# Save the plot
+ggsave("crime_plot.png", width = 10, height = 6, dpi = 300)
+
+
