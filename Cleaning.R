@@ -210,12 +210,23 @@ merged_data <- merged_data |>
   )
 
 
-#close or not close
+#close or not close ####
 merged_data <- merged_data |>
   mutate(
     close = as.numeric(crime_distance_miles_fs <= 0.25),
     far = as.numeric(crime_distance_miles_fs > 0.25)
   )
+
+merged_data <- merged_data |>
+  mutate(
+    close = as.numeric(crime_distance_miles_fs <= 0.25),
+    far = as.numeric(crime_distance_miles_fs > 0.25),
+    
+    close_0_5  = as.numeric(crime_distance_miles_fs <= 0.5),
+    far_0_5    = as.numeric(crime_distance_miles_fs > 0.5)
+    
+  )
+
 
 merged_data |> count(close, far)
 
@@ -240,7 +251,7 @@ daily_data <- merged_data |>
 
 
 daily_data <- merged_data |>
-  group_by(date, close, theft, violent) |>
+  group_by(date, close, theft, violent,) |>
   summarise(
     TotalCrimes = n(),
     after_open = max(after_open),
@@ -272,6 +283,12 @@ daily_dataset_no_na <- full_grid |>
     after_open = ifelse(is.na(after_open), as.numeric(date >= as.Date("2018-06-16")), after_open)
   ) |>
   arrange(date, close, theft, violent)
+
+daily_dataset_no_na <- daily_dataset_no_na |>
+  mutate(
+    close_0_5 = as.numeric(close == 1 | crime_distance_miles_fs <= 0.5),  # 1 if within 0.5 miles
+    far_0_5   = as.numeric(crime_distance_miles_fs > 0.5)                 # 1 if further than 0.5 miles
+  )
 
 # fun ---------------------------------------------------------------------
 
@@ -384,7 +401,7 @@ final_table <- table_df |>
 final_table
 
 
-#Save final table as htmle####
+#Save final table as html####
 
 kable_html <- kable(final_table,
                     caption = "Table 1: Difference-in-Differences Estimate of Effect of Store Opening on Nearby Crime",
@@ -396,13 +413,122 @@ save_kable(kable_html, "Table 1.html")
 
 
 
-#create models for farther distance (0.5 miles)####
+#Create new daily data for 0.5 mile radius####
+daily_dataset_0_5 <- merged_data |>
+  group_by(date, close_0_5, theft, violent) |>
+  summarise(
+    TotalCrimes = n(),
+    after_open = max(after_open),
+    .groups = "drop"
+  ) |>
+  arrange(date)
+
+#drop na
+daily_dataset_0_5 <- daily_dataset_0_5 |>
+  tidyr::drop_na(TotalCrimes, close_0_5, theft, violent, after_open)
+
+#Model 5: 0.5 radius, Violent - no, theft - yes####
+model5 <- lm(
+  TotalCrimes ~ close_0_5 + after_open + close_0_5:after_open,
+  data = daily_dataset_0_5,
+  subset = (violent == 0 & theft == 1)
+)
+#Model 6: 0.5 radius, violent yes, theft yes####
+
+model6<- lm(
+  TotalCrimes ~ close_0_5 + after_open + close_0_5:after_open,
+  data = daily_dataset_0_5,
+  subset = (violent == 1 & theft == 1)
+)
+
+#Model 7: 0.5 radius. violent yes, theft no####
+model7 <- lm(
+  TotalCrimes ~ close_0_5 + after_open + close_0_5:after_open,
+  data = daily_dataset_0_5,
+  subset = (violent == 1 & theft == 0)
+)
+
+#Model 8: 0.5 mile radius, violent - no, theft - no####
+model8 <- lm(
+  TotalCrimes ~ close_0_5 + after_open + close_0_5:after_open,
+  data = daily_dataset_0_5,
+  subset = (violent == 0 & theft == 0)
+)
 
 
+#Create table 2: (the 0.5 mile radius)####
 
+# List of models
+models_list <- list(
+  "Model 5" = model5,
+  "Model 6" = model6,
+  "Model 7" = model7,
+  "Model 8" = model8
+)
 
+# Map models to Theft/Violent flags
+model_flags <- list(
+  "Model 5" = list(Theft = "Yes", Violent = "No"),
+  "Model 6" = list(Theft = "Yes", Violent = "Yes"),
+  "Model 7" = list(Theft = "No",  Violent = "Yes"),
+  "Model 8" = list(Theft = "No",  Violent = "No")
+)
 
+# Function to extract model info
+extract_model_info <- function(mod, name) {
+  
+  coefs <- broom::tidy(mod) |> 
+    mutate(
+      term = case_when(
+        term == "(Intercept)" ~ "Intercept",
+        term == "close" ~ "Close",
+        term == "after_open" ~ "After Store Opened",
+        term == "close:after_open" ~ "Close × After",
+        TRUE ~ term
+      ),
+      stars = case_when(
+        p.value < 0.01 ~ "***",
+        p.value < 0.05 ~ "**",
+        p.value < 0.10 ~ "*",
+        TRUE ~ ""
+      ),
+      estimate = paste0(round(estimate, 2), stars)
+    ) |> 
+    select(term, estimate)
+  
+  stats <- tibble(
+    term = c("Theft Only", "Violent Only", "N", "Adj R²"),
+    estimate = c(
+      model_flags[[name]]$Theft,
+      model_flags[[name]]$Violent,
+      as.character(floor(nrow(mod$model))),
+      as.character(floor(summary(mod)$adj.r.squared*100)/100)
+    )
+  )
+  
+  bind_rows(coefs, stats) |> mutate(Model = name)
+}
 
+# Build table
+table_df2 <- bind_rows(
+  lapply(names(models_list), function(x) extract_model_info(models_list[[x]], x))
+)
+
+final_table2 <- table_df2 |> 
+  pivot_wider(names_from = Model, values_from = estimate) |> 
+  rename(Variable = term) |> 
+  select(Variable, `Model 5`, `Model 6`, `Model 7`, `Model 8`)
+
+final_table2
+
+# Save table 2####
+kable_html2 <- kable(final_table2,
+                    caption = "Table 2: Difference-in-Differences Estimate of Effect of Store Opening on Nearby Crime (0.5 mile radius)",
+                    align = "lcccc") |> 
+  kable_styling(full_width = FALSE)
+
+# Save as HTML file
+save_kable(kable_html2, "Table 2.html")
 
 
 # Interactive Map -------------------------------------------------------------------------
